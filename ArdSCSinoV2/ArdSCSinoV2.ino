@@ -171,8 +171,8 @@ inline int parity(byte val) {
 void setup()
 {
   // PA15 / PB3 / PB4 が使えない
-  // JTAG デバッグ用に使われているからです。
-  disableDebugPorts();
+  // But only disable JTAG not SWD
+  afio_cfg_debug_ports(AFIO_DEBUG_SW_ONLY);
 
   //シリアル初期化
   //Serial.begin(9600);
