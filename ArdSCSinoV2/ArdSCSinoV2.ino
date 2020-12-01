@@ -93,17 +93,28 @@ inline void writeIO(byte v)
 {
   //GPIO(SCSI BUS)初期化
   //ポート設定レジスタ（下位）
-  GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
-  //ポート設定レジスタ（上位）
-  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
 //  GPIOB->regs->ODR != 0x0000FF00; // SET PULL-UPs on PB15-PB8
+/*  LOGHEXN((v));
+  LOGHEXN((GPIOB->regs->ODR & 0x00ff));
+  LOGHEXN((  (GPIOB->regs->ODR & 0x00ff) | (0xff00 & (v <<8)))); */
+GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~v) <<8) )| parity(v) ;
+/*
+  if(!parity(v)) {
+    GPIOB->regs->BRR = 1;
+  } else {
+    GPIOB->regs->BSRR = 1;
+  }
+*/
+/*
   uint32 retL =  0x00;
   uint32 retH =  0x00;
+  LOGHEXN(v);
   if(!parity(v)) {
     retL |= (1<<0);
   } else {
     retH |= (1<<0);
   }
+  /*
   if(v & ( 1 << 7 )) {
     retL |= (1<<15);
   } else {
@@ -143,11 +154,15 @@ inline void writeIO(byte v)
     retL |= (1<<8);
   } else {
     retH |= (1<<8);
-  }
+  } */
+  /*retL |= v<<8;
+  retH |= 0xffff & ((~v)<<8); 
+  LOGHEXN(retL);
+  LOGHEXN(retH);
   //ビットがLOWに設定される
   GPIOB->regs->BRR = retL ;
   // ビットがHIGHに設定される
-  GPIOB->regs->BSRR = retH ;
+  GPIOB->regs->BSRR = retH ; */ 
 }
 
 /*
@@ -155,8 +170,6 @@ inline void writeIO(byte v)
  *  パリティチェック
  */
 inline int parity(byte val) {
-  val ^= val >> 16;
-  val ^= val >> 8;
   val ^= val >> 4;
   val ^= val >> 2;
   val ^= val >> 1;
@@ -279,17 +292,21 @@ byte readHandshake(void)
 /*
  * ハンドシェイクで書込み.
  */
-void writeHandshake(byte d)
+inline void writeHandshake(byte d)
 {
   writeIO(d);
-  gpio_write(REQ, high);
-  while(isLow(gpio_read(ACK))) {
+  GPIOB->regs->BRR = 1 << 6;
+  //gpio_write(REQ, high);
+  while(GPIOA->regs->IDR & (1 << 10)) {
+  //while(isLow(gpio_read(ACK))) {
     if(m_isBusReset) {
       return;
     }
   }
-  gpio_write(REQ, low);
-  while(isHigh(gpio_read(ACK))) {
+  GPIOB->regs->BSRR = 1<<6;
+  //gpio_write(REQ, low);
+  //while(isHigh(gpio_read(ACK))) {
+  while(!(GPIOA->regs->IDR & (1<<10))) {
     if(m_isBusReset) {
       return;
     }
@@ -306,6 +323,10 @@ void writeDataPhase(int len, byte* p)
   gpio_write(MSG, low);
   gpio_write(CD, low);
   gpio_write(IO, high);
+  GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
+  //ポート設定レジスタ（上位）
+  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
+
   for (int i = 0; i < len; i++) {
     if(m_isBusReset) {
       return;
@@ -326,6 +347,10 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
   gpio_write(MSG, low);
   gpio_write(CD, low);
   gpio_write(IO, high);
+    GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
+  //ポート設定レジスタ（上位）
+  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
+
   for(uint32_t i = 0; i < len; i++) {
     m_file.read(m_buf, BLOCKSIZE);
     for(int j = 0; j < BLOCKSIZE; j++) {
@@ -501,6 +526,10 @@ void MsgIn2(int msg)
   gpio_write(MSG, high);
   gpio_write(CD, high);
   gpio_write(IO, high);
+    GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
+  //ポート設定レジスタ（上位）
+  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
+
   writeHandshake(msg);
 }
 
@@ -711,6 +740,10 @@ void loop()
   gpio_write(MSG, low);
   gpio_write(CD, high);
   gpio_write(IO, high);
+    GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
+  //ポート設定レジスタ（上位）
+  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
+
   writeHandshake(sts);
   if(m_isBusReset) {
      goto BusFree;
@@ -720,6 +753,10 @@ void loop()
   gpio_write(MSG, high);
   gpio_write(CD, high);
   gpio_write(IO, high);
+    GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
+  //ポート設定レジスタ（上位）
+  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
+
   writeHandshake(msg);
 
 BusFree:
