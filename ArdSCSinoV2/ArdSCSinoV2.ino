@@ -70,10 +70,10 @@ inline byte readIO(void)
   //ポート設定レジスタ（下位）
 //  GPIOB->regs->CRL |= 0x000000008; // SET INPUT W/ PUPD on PAB-PB0
   //ポート設定レジスタ（上位）
-  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
+  
 //  GPIOB->regs->ODR = 0x0000FF00; // SET PULL-UPs on PB15-PB8
   //ポート入力データレジスタ
-  uint32 ret = GPIOB->regs->IDR;
+/*  uint32 ret = GPIOB->regs->IDR;
   byte bret =  0x00;
   bret |= (!(ret & (1<<15))) << 7;
   bret |= (!(ret & (1<<14))) << 6;
@@ -83,7 +83,8 @@ inline byte readIO(void)
   bret |= (!(ret & (1<<10))) << 2;
   bret |= (!(ret & (1<<9)))  << 1;
   bret |= (!(ret & (1<<8)))  << 0;
-  return bret;
+  return bret; */
+  return 0xff & (~(GPIOB->regs->IDR >> 8));
 }
 
 /* 
@@ -271,8 +272,9 @@ void onBusReset(void)
 /*
  * ハンドシェイクで読み込む.
  */
-byte readHandshake(void)
+inline byte readHandshake(void)
 {
+  
   gpio_write(REQ, high);
   while(isLow(gpio_read(ACK))) {
     if(m_isBusReset) {
@@ -374,6 +376,7 @@ void readDataPhaseSD(uint32_t adds, uint32_t len)
   gpio_write(MSG, low);
   gpio_write(CD, low);
   gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   for(uint32_t i = 0; i < len; i++) {
     for(int j = 0; j < BLOCKSIZE; j++) {
       if(m_isBusReset) {
@@ -542,6 +545,7 @@ void MsgOut2()
   gpio_write(MSG, high);
   gpio_write(CD, high);
   gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   m_msb[m_msc] = readHandshake();
   m_msc++;
   m_msc %= 256;
@@ -566,6 +570,7 @@ void loop()
     return;
   }
   // BSY+ SEL-
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   byte db = readIO();  
   if((db & (1 << SCSIID)) == 0) {
     return;
@@ -635,6 +640,7 @@ void loop()
   gpio_write(MSG, low);
   gpio_write(CD, high);
   gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   int len;
   byte cmd[12];
   cmd[0] = readHandshake();
@@ -656,6 +662,7 @@ void loop()
   default:
     break;
   }
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   for(int i = 1; i < len; i++ ) {
     cmd[i] = readHandshake();
     LOGHEX(cmd[i]);
