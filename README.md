@@ -1,37 +1,37 @@
 # ArdSCSino-stm32
 
-Translation stolen from Eric Helgeson.
+The idea and the base code was taken from a project created by Tambo (TNB Seisakusho) (https://twitter.com/h_koma2) ArdSCSino is hardware that reproduces SCSI devices (hard disks) with arduino.
 
-ArdSCSino-stm32 is the STM32 version of ArdSCSino created by Tambo (TNB Seisakusho) (https://twitter.com/h_koma2) ArdSCSino is hardware that reproduces SCSI devices (hard disks) with arduino. We will publish it with permission.
+### Setup
 
-#Setup
-
-I am using Arduino Software (IDE) V1.8.8.
+I am using Arduino Software (IDE) V1.8.13.
 Tools-> Boards-> Board Manager-> Search Filters Search and install "Arduino SAM board (32-bit ARM Cortex-M3)" Select the board "Generic STM32F103C series"
 
 I am using the following as a library.
 
 SDFAT (https://github.com/greiman/SdFat/tree/1.1.4) 
 
-## Make sure to use V1 of SdFat (for example V1.1.4 )
-## Make sure to set the #define ENABLE_EXTENDED_TRANSFER_CLASS 1 in SdFatConfig.h
+Make sure to use V1 of SdFat (for example V1.1.4 )
+Make sure to set the #define ENABLE_EXTENDED_TRANSFER_CLASS 1 in SdFatConfig.h
 
 Arduino_STM32 (https://github.com/rogerclarkmelbourne/Arduino_STM32/releases/tag/v1.0.0)
-
-I am using the following as a micro SD CARD adapter.
-
-ArdSCSIno V1
-Arduino SPI Micro SD Adapter 6PIN Compatible Micro SD TF Card Memory Shield Module
 
 ArdSCSIno V2
 Hirose DM3AT-SF-PEJM5
 
+## Enhancements
 
-ArdSCSino-stm32 とは たんぼ（TNB製作所）(https://twitter.com/h_koma2) さんが作成した ArdSCSino のSTM32版です<br>
-ArdSCSino とは SCSIデバイス（ハードディスク）を arduino で再現するハードウエアです。<br>
-許可を頂いて公開することになりました。<br>
+In the STM32SCSISD folder there is a new PCB which integrates the following features:
+* Floppy / AMP / TE connectivity connector.
+* Pin headers for serial port, USB, SWD connectors. The use of these are for debugging only and is purely optional.
+* Jumpers for RESET and BOOT. Also only needed for debuging.
+* Jumpers for and image select. The image select feature allow for selecting one out of four images on the card when the SCSI device is selected.
+* Jumpers for unit select. Allow the settig of the SCSI ID. The ID is also used to select one of seven sets of images as defined by the image select above.
+* Activity LED pin header.
+* Mounting holes.
 
-# Setup
-* Arduino Software (IDE) V1.8.8 を使用しています。<br>
- ライブラリとしてSDFAT (https://github.com/greiman/SdFat) を使用しています。 <br>
+The firmware has been improved by optimizing how data is transfered to the SCSI port. One transaction is now 1.2 microsseconds and the innerloop consists of 30 instructions. Please make sure that you use -O3 optimizations when compiling the project.
 
+Real life copying of 5 Mbyte file under RT-11 operating system running on a PDP-11/23 CPU takes 23 seconds which is equivalent of 218kbytes/s copying speed. Comparing this with the SCSI2SD v5 adapter gives a 305kbytes/s copying speed. 
+
+The design has also been tested successfully with a Luxor ABC1600 computer.
