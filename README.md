@@ -11,13 +11,10 @@ I am using the following as a library.
 
 SDFAT (https://github.com/greiman/SdFat/tree/1.1.4) 
 
-Make sure to use V1 of SdFat (for example V1.1.4 )
-Make sure to set the #define ENABLE_EXTENDED_TRANSFER_CLASS 1 in SdFatConfig.h
+* Make sure to use V1 of SdFat (for example V1.1.4 )
+* Make sure to set the #define ENABLE_EXTENDED_TRANSFER_CLASS 1 in SdFatConfig.h
 
 Arduino_STM32 (https://github.com/rogerclarkmelbourne/Arduino_STM32/releases/tag/v1.0.0)
-
-ArdSCSIno V2
-Hirose DM3AT-SF-PEJM5
 
 ## Enhancements
 
@@ -30,7 +27,9 @@ In the STM32SCSISD folder there is a new PCB which integrates the following feat
 * Activity LED pin header.
 * Mounting holes.
 
-The firmware has been improved by optimizing how data is transfered to the SCSI port. One transaction is now 1.2 microsseconds and the innerloop consists of 30 instructions. Please make sure that you use -O3 optimizations when compiling the project.
+
+
+The firmware (in STM32SCSISD_FW) has been improved by optimizing how data is transfered to the SCSI port. One SCSI transaction is now 1.2 microsseconds and the innerloop consists of 30 instructions. Please make sure that you use -O3 optimizations when compiling the project.
 
 Real life copying of 5 Mbyte file under RT-11 operating system running on a PDP-11/23 CPU takes 23 seconds which is equivalent of 218kbytes/s copying speed. Comparing this with the SCSI2SD v5 adapter gives a 305kbytes/s copying speed. 
 
