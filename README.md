@@ -31,6 +31,10 @@ In the STM32SCSISD folder there is a new PCB which integrates the following feat
 
 The firmware (in STM32SCSISD_FW) has been improved by optimizing how data is transfered to the SCSI port. One SCSI transaction is now 1.2 microsseconds and the innerloop consists of 30 instructions. Please make sure that you use -O3 optimizations when compiling the project.
 
+```
+arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb ArdSCSinoV2.cpp ../../SdFat/src/FatLib/FatFile.cpp  -I../../Arduino_STM32/STM32F1/libraries/SPI/src/ -I../../Arduino_STM32/STM32F1/system/libmaple/include/ -I../../Arduino_STM32/STM32F1/system/libmaple/ -I../../Arduino_STM32/STM32F1/cores/maple/ -I../../Arduino_STM32/STM32F1/variants/generic_stm32f103c -DMCU_STM32F103C8 -I../../Arduino_STM32/STM32F1/system/libmaple/stm32f1/include/ -I../../SdFat/src/ -DARDUINO -DF_CPU=72000000 -D__arm__ -D__STM32F1__ -Dnullptr=NULL -O3
+```
+
 Real life copying of 5 Mbyte file under RT-11 operating system running on a PDP-11/23 CPU takes 23 seconds which is equivalent of 218kbytes/s copying speed. Comparing this with the SCSI2SD v5 adapter gives a 305kbytes/s copying speed. 
 
 The design has also been tested successfully with a Luxor ABC1600 computer.
