@@ -81,8 +81,8 @@ inline byte readIO(void)
   bret |= (!(ret & (1<<12))) << 4;
   bret |= (!(ret & (1<<11))) << 3;
   bret |= (!(ret & (1<<10))) << 2;
-  bret |= (!(ret & (1<<8)))  << 1;
-  bret |= (!(ret & (1<<9)))  << 0;
+  bret |= (!(ret & (1<<9)))  << 1;
+  bret |= (!(ret & (1<<8)))  << 0;
   return bret;
 }
 
@@ -134,12 +134,12 @@ inline void writeIO(byte v)
   } else {
     retH |= (1<<10);
   }
-  if(v & ( 1 << 0 )) {
+  if(v & ( 1 << 1 )) {
     retL |= (1<<9);
   } else {
     retH |= (1<<9);
   }
-  if(v & ( 1 << 1 )) {
+  if(v & ( 1 << 0 )) {
     retL |= (1<<8);
   } else {
     retH |= (1<<8);
