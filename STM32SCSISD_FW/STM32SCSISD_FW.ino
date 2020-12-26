@@ -66,24 +66,7 @@ bool          m_msb[256];
  */
 inline byte readIO(void)
 {
-  //GPIO(SCSI BUS)初期化
-  //ポート設定レジスタ（下位）
-//  GPIOB->regs->CRL |= 0x000000008; // SET INPUT W/ PUPD on PAB-PB0
-  //ポート設定レジスタ（上位）
-  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
-//  GPIOB->regs->ODR = 0x0000FF00; // SET PULL-UPs on PB15-PB8
-  //ポート入力データレジスタ
-  uint32 ret = GPIOB->regs->IDR;
-  byte bret =  0x00;
-  bret |= (!(ret & (1<<15))) << 7;
-  bret |= (!(ret & (1<<14))) << 6;
-  bret |= (!(ret & (1<<13))) << 5;
-  bret |= (!(ret & (1<<12))) << 4;
-  bret |= (!(ret & (1<<11))) << 3;
-  bret |= (!(ret & (1<<10))) << 2;
-  bret |= (!(ret & (1<<9)))  << 1;
-  bret |= (!(ret & (1<<8)))  << 0;
-  return bret;
+  return 0xff & (~(GPIOB->regs->IDR >> 8));
 }
 
 /* 
@@ -97,6 +80,8 @@ inline void writeIO(byte v)
   //ポート設定レジスタ（上位）
   GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
 //  GPIOB->regs->ODR != 0x0000FF00; // SET PULL-UPs on PB15-PB8
+GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~v) <<8) )| parity(v) ;
+/*
   uint32 retL =  0x00;
   uint32 retH =  0x00;
   if(!parity(v)) {
@@ -147,7 +132,7 @@ inline void writeIO(byte v)
   //ビットがLOWに設定される
   GPIOB->regs->BRR = retL ;
   // ビットがHIGHに設定される
-  GPIOB->regs->BSRR = retH ;
+  GPIOB->regs->BSRR = retH ;*/
 }
 
 /*
@@ -258,8 +243,9 @@ void onBusReset(void)
 /*
  * ハンドシェイクで読み込む.
  */
-byte readHandshake(void)
+inline byte readHandshake(void)
 {
+  // GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   gpio_write(REQ, high);
   while(isLow(gpio_read(ACK))) {
     if(m_isBusReset) {
@@ -349,6 +335,7 @@ void readDataPhaseSD(uint32_t adds, uint32_t len)
   gpio_write(MSG, low);
   gpio_write(CD, low);
   gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   for(uint32_t i = 0; i < len; i++) {
     for(int j = 0; j < BLOCKSIZE; j++) {
       if(m_isBusReset) {
@@ -513,6 +500,7 @@ void MsgOut2()
   gpio_write(MSG, high);
   gpio_write(CD, high);
   gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   m_msb[m_msc] = readHandshake();
   m_msc++;
   m_msc %= 256;
@@ -537,6 +525,7 @@ void loop()
     return;
   }
   // BSY+ SEL-
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   byte db = readIO();  
   if((db & (1 << SCSIID)) == 0) {
     return;
@@ -608,6 +597,7 @@ void loop()
   gpio_write(IO, low);
   int len;
   byte cmd[12];
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   cmd[0] = readHandshake();
   LOGHEX(cmd[0]);
   len = 1;
@@ -627,6 +617,7 @@ void loop()
   default:
     break;
   }
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   for(int i = 1; i < len; i++ ) {
     cmd[i] = readHandshake();
     LOGHEX(cmd[i]);
