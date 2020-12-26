@@ -104,7 +104,7 @@ void setup()
 
   //PINの初期化
   gpio_mode(LED, GPIO_OUTPUT_OD);
-  gpio_write(LED, low);
+  blinkLED(500);
 
  //GPIO(SCSI BUS)初期化
   //ポート設定レジスタ（下位）
@@ -134,13 +134,13 @@ void setup()
   
   if(!SD.begin(SD_CS,SPI_FULL_SPEED)) {
     Serial.println("SD initialization failed!");
-    onFalseInit();
+    signalErrorCode(1);
   }
   //HDイメージファイル
   m_file = SD.open(HDIMG_FILE, O_RDWR);
   if(!m_file) {
     Serial.println("Error: open hdimg");
-    onFalseInit();
+    signalErrorCode(2);
   }
   m_fileSize = m_file.size();
   Serial.println("Found Valid HD Image File.");
@@ -152,16 +152,24 @@ void setup()
   Serial.println("MB");
 }
 
+
+void blinkLED (int length) {
+    gpio_write(LED, high);
+    delay(length); 
+    gpio_write(LED, low);
+    delay(length);
+}
+
 /*
- * 初期化失敗.
+ * Signal code # of short blinks followed by a long blink.
  */
-void onFalseInit(void)
+void signalErrorCode(int code)
 {
   while(true) {
-    gpio_write(LED, high);
-    delay(500); 
-    gpio_write(LED, low);
-    delay(500);
+    for (int i=0; i< code; i++) {
+      blinkLED(200);
+    }
+    blinkLED(1000);
   }
 }
 
@@ -179,28 +187,6 @@ void onBusReset(void)
   }
 }
 
-/*
- * ハンドシェイクで読み込む.
- */
-inline byte readHandshake(void)
-{
-  // GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
-  gpio_write(REQ, high);
-  while(isLow(gpio_read(ACK))) {
-    if(m_isBusReset) {
-      return 0;
-    }
-  }
-  byte r = readIO();
-  gpio_write(REQ, low);
-  while(isHigh(gpio_read(ACK))) {
-    if(m_isBusReset) {
-      return 0;
-    }
-  }
-  return r;  
-}
-
 inline void setREQActive() {
   GPIOA->regs->BRR = 1 << 1;  
 }
@@ -214,7 +200,29 @@ inline int isACKActive() {
 }
 
 /*
- * ハンドシェイクで書込み.
+ * Handshake one byte from the host.
+ */
+inline byte readHandshake(void)
+{
+  setREQActive();
+  while(isACKActive()) {
+    if(m_isBusReset) {
+      return 0;
+    }
+  }
+  byte r = readIO();
+  setREQInactive();
+  while(!isACKActive()) {
+    if(m_isBusReset) {
+      return 0;
+    }
+  }
+  return r;  
+}
+
+
+/*
+ *  Handshake of one single byte towardss the host.
  */
 inline void writeHandshake(byte d)
 {
