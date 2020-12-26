@@ -201,22 +201,32 @@ inline byte readHandshake(void)
   return r;  
 }
 
+inline void setREQActive() {
+  GPIOA->regs->BRR = 1 << 1;  
+}
+
+inline void setREQInactive() {
+  GPIOA->regs->BSRR = 1 << 1;  
+}
+
+inline int isACKActive() {
+ return GPIOB->regs->IDR & (1 << 4);
+}
+
 /*
  * ハンドシェイクで書込み.
  */
 inline void writeHandshake(byte d)
 {
-  //GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
-  //GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
   writeIO(d);
-  gpio_write(REQ, high);
-  while(isLow(gpio_read(ACK))) {
+  setREQActive();
+  while(isACKActive()) {
     if(m_isBusReset) {
       return;
     }
   }
-  gpio_write(REQ, low);
-  while(isHigh(gpio_read(ACK))) {
+  setREQInactive();
+  while(!isACKActive()) {
     if(m_isBusReset) {
       return;
     }
