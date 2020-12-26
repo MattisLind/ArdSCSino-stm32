@@ -40,9 +40,9 @@ SdFatEX  SD(&SPI_1);
 #define RST       PB5     // SCSI:RST
 #define MSG       PB6      // SCSI:MSG
 #define SEL       PB7      // SCSI:SEL
-#define CD        PA0      // SCSI:C/D
+#define CD        PA2      // SCSI:I/O
 #define REQ       PA1      // SCSI:REQ
-#define IO        PA2      // SCSI:I/O
+#define IO        PA0      // SCSI:C/D
 
 #define SD_CS     PA4      // SDCARD:CS
 #define LED       PC13     // LED
@@ -81,8 +81,8 @@ inline byte readIO(void)
   bret |= (!(ret & (1<<12))) << 4;
   bret |= (!(ret & (1<<11))) << 3;
   bret |= (!(ret & (1<<10))) << 2;
-  bret |= (!(ret & (1<<9)))  << 1;
-  bret |= (!(ret & (1<<8)))  << 0;
+  bret |= (!(ret & (1<<8)))  << 1;
+  bret |= (!(ret & (1<<9)))  << 0;
   return bret;
 }
 
@@ -134,12 +134,12 @@ inline void writeIO(byte v)
   } else {
     retH |= (1<<10);
   }
-  if(v & ( 1 << 1 )) {
+  if(v & ( 1 << 0 )) {
     retL |= (1<<9);
   } else {
     retH |= (1<<9);
   }
-  if(v & ( 1 << 0 )) {
+  if(v & ( 1 << 1 )) {
     retL |= (1<<8);
   } else {
     retH |= (1<<8);
