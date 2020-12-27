@@ -2,7 +2,7 @@
 
   (general
     (thickness 1.6)
-    (drawings 38)
+    (drawings 39)
     (tracks 543)
     (zones 0)
     (modules 41)
@@ -2236,6 +2236,9 @@
     (pad 1 np_thru_hole circle (at 0 0) (size 4 4) (drill 4) (layers *.Cu *.Mask))
   )
 
+  (gr_text V1.1 (at 83.185 46.99) (layer F.SilkS)
+    (effects (font (size 1.5 1.5) (thickness 0.3)))
+  )
   (gr_text SCSI (at 71.755 121.92) (layer F.SilkS)
     (effects (font (size 1.5 1.5) (thickness 0.3)))
   )
