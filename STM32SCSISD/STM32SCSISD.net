@@ -1,7 +1,7 @@
 (export (version D)
   (design
     (source /home/mattis/ArdSCSino-stm32/STM32SCSISD/STM32SCSISD.sch)
-    (date "sön 27 dec 2020 14:28:10")
+    (date "sön 27 dec 2020 14:45:16")
     (tool "Eeschema 5.0.2-bee76a0~70~ubuntu16.04.1")
     (sheet (number 1) (name /) (tstamps /)
       (title_block
@@ -262,6 +262,7 @@
       (tstamp 5FDBCA95))
     (comp (ref D1)
       (value "ACTIVITY LED")
+      (footprint LED_THT:LED_D5.0mm)
       (datasheet ~)
       (libsource (lib Device) (part LED_Small_ALT) (description "Light emitting diode, small symbol, filled shape"))
       (sheetpath (names /) (tstamps /))
