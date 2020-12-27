@@ -1,13 +1,16 @@
 /*
- * SCSI-HDデバイスエミュレータ
+ * STM 32 SCSI based on ArdSCSino. 
  */
 #include <SPI.h>
 #include "SdFat.h"
+// To save some instructions and increase speed a bit it is possible to not compile the parity stuff. But most systems
+// need it...
 #define PARITY 1
+// Uncomment the following line to include debuging over USB Serial port.
 //#define DEBUG 1
+// Make sure to use SdFat v1.x not v2.x
+// Make sure to add ENABLE_EXTENDED_TRANSFER_CLASS 1 to the libraries/SdFat/SdFatConfig.h file.
 
-//ENABLE_EXTENDED_TRANSFER_CLASSを1に設定する
-//libraries/SdFat/SdFatConfig.h
 SPIClass SPI_1(1);
 SdFatEX  SD(&SPI_1);
 #ifdef DEBUG 
@@ -54,7 +57,13 @@ SdFatEX  SD(&SPI_1);
 #define SD_CS     PA4      // SDCARD:CS
 #define LED       PC13     // LED
 
-#define SCSIID    0                 // SCSI-ID 
+#define UNITSELECT0 PC14
+#define UNITSELECT1 PC15
+#define UNITSELECT2 PA3
+#define IMAGESELECT0 PA8
+#define IMAGESELECT1 PB1
+
+int SCSIID;             
 
 #define BLOCKSIZE 512               // 1BLOCKサイズ
 uint8_t       m_senseKey = 0;       //センスキー
@@ -101,32 +110,66 @@ inline int parity(byte val) {
   return val & 0x00000001;
 }
 #endif
+
+int getUnitSelectJumpers () {
+  return 7-(digitalRead(UNITSELECT0) | digitalRead(UNITSELECT1) << 1 |  digitalRead(UNITSELECT2) << 2);
+}
+
+int getImageSelectJumpers () {
+  return 3-(digitalRead(IMAGESELECT0) | digitalRead(IMAGESELECT1) << 1);
+}
+
+void blinkLED (int length) {
+    gpio_write(LED, high);
+    delay(length); 
+    gpio_write(LED, low);
+    delay(length);
+}
+
 /*
- * 初期化.
- *  バスの初期化、PINの向きの設定を行う
+ *  Setup code
  */
 void setup()
 {
+  char unitNo[2];
+  char imageNo[2];
+  int i;
+  char fullFileName [13];
+  fullFileName[0]=0;
   // PA15 / PB3 / PB4 is needed.
   // But only disable JTAG not SWD
   afio_cfg_debug_ports(AFIO_DEBUG_SW_ONLY);
-
-  //シリアル初期化
-  #ifdef DEBUG
-  Serial.begin(9600);
-  while (!Serial);
-  #endif
   // Activity LED
   gpio_mode(LED, GPIO_OUTPUT_OD);
   blinkLED(500);
-
- //GPIO(SCSI BUS)初期化
-  //ポート設定レジスタ（下位）
-//  GPIOB->regs->CRL |= 0x000000008; // SET INPUT W/ PUPD on PAB-PB0
-  //ポート設定レジスタ（上位）
+  SCSIID = getUnitSelectJumpers();
+  for (i=0;i<SCSIID;i++) {
+    blinkLED(200);  
+  }
+  #ifdef DEBUG
+  Serial.begin(9600);
+  while (!Serial);
+  blinkLED(200);
+  blinkLED(200);
+  Serial.print("SCSIID: ");
+  Serial.println(SCSIID);
+  #endif
+  
+  unitNo[0] = 0x30 + SCSIID;
+  unitNo[1]=0;
+  imageNo[0] = 0x30 + getImageSelectJumpers();
+  imageNo[1] = 0;
+  strcat(fullFileName, "DISK");
+  strcat(fullFileName, unitNo);
+  strcat(fullFileName, imageNo);
+  strcat(fullFileName, ".DSK");
+  
   GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
-//  GPIOB->regs->ODR = 0x0000FF00; // SET PULL-UPs on PB15-PB8
-
+  gpio_mode(UNITSELECT0, GPIO_INPUT_PU);
+  gpio_mode(UNITSELECT1, GPIO_INPUT_PU);
+  gpio_mode(UNITSELECT2, GPIO_INPUT_PU);
+  gpio_mode(IMAGESELECT0, GPIO_INPUT_PU);
+  gpio_mode(IMAGESELECT1, GPIO_INPUT_PU);
   gpio_mode(ATN, GPIO_INPUT_PU);
   gpio_mode(BSY, GPIO_INPUT_PU);
   gpio_mode(ACK, GPIO_INPUT_PU);
@@ -143,7 +186,7 @@ void setup()
   gpio_write(REQ, low);
   gpio_write(IO, low);
 
-  //RSTピンの状態がHIGHからLOWに変わったときに発生
+  //RST
   attachInterrupt(RST, onBusReset, FALLING);
 
   // Start up the SD card
@@ -153,13 +196,20 @@ void setup()
     #endif
     signalErrorCode(1);
   }
-  //Open the image file
-  m_file = SD.open(HDIMG_FILE, O_RDWR);
-  if(!m_file) {
-    #ifdef DEBUG
-    Serial.println("Error: open hdimg");
-    #endif
-    signalErrorCode(2);
+  #ifdef DEBUG 
+  Serial.print("Trying to open file: ");
+  Serial.println(fullFileName);
+  #endif
+  //Open the image -  file first try the filename based on the specified unit and image number.
+  m_file = SD.open(fullFileName, O_RDWR);
+  if (!m_file) {
+    m_file = SD.open(HDIMG_FILE, O_RDWR);
+    if(!m_file) {
+      #ifdef DEBUG
+      Serial.println("Error: open hdimg");
+      #endif
+      signalErrorCode(2);
+    }
   }
   m_fileSize = m_file.size();
   #ifdef DEBUG
@@ -174,12 +224,7 @@ void setup()
 }
 
 
-void blinkLED (int length) {
-    gpio_write(LED, high);
-    delay(length); 
-    gpio_write(LED, low);
-    delay(length);
-}
+
 
 /*
  * Signal code # of short blinks followed by a long blink.
@@ -513,6 +558,10 @@ void loop()
   // BSY+ SEL-
   GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
   byte db = readIO();  
+  LOGN("SELECTION");
+  LOGHEX(db);
+  LOGN("");
+  LOGHEX(SCSIID);
   if((db & (1 << SCSIID)) == 0) {
     return;
   }
