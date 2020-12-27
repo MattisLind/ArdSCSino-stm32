@@ -70,17 +70,6 @@ F 3 "~" H 1450 5900 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L Connector:Conn_01x04_Male J3
-U 1 1 5FC2CB36
-P 1500 6850
-F 0 "J3" H 1606 7128 50  0000 C CNN
-F 1 "USB" H 1606 7037 50  0000 C CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical" H 1500 6850 50  0001 C CNN
-F 3 "~" H 1500 6850 50  0001 C CNN
-	1    1500 6850
-	1    0    0    -1  
-$EndComp
-$Comp
 L Device:Jumper JP5
 U 1 1 5FC2CC3D
 P 3750 2700
@@ -122,17 +111,6 @@ F 1 "UNITSEL2" H 6450 6223 50  0000 C CNN
 F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 6450 6050 50  0001 C CNN
 F 3 "~" H 6450 6050 50  0001 C CNN
 	1    6450 6050
-	1    0    0    -1  
-$EndComp
-$Comp
-L Connector:Conn_01x02_Male J5
-U 1 1 5FC2D24F
-P 3850 5800
-F 0 "J5" H 3956 5978 50  0000 C CNN
-F 1 "ACTIVITYLED" H 3956 5887 50  0000 C CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 3850 5800 50  0001 C CNN
-F 3 "~" H 3850 5800 50  0001 C CNN
-	1    3850 5800
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -807,12 +785,6 @@ F 3 "" H 1800 7150 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	1700 6750 1950 6750
-Wire Wire Line
-	1700 7050 1800 7050
-Wire Wire Line
-	1800 7050 1800 7150
-Wire Wire Line
 	1650 6000 2200 6000
 Wire Wire Line
 	1650 5900 2200 5900
@@ -862,8 +834,6 @@ Wire Wire Line
 Wire Wire Line
 	2400 6450 2400 6500
 Wire Wire Line
-	1950 6450 1950 6750
-Wire Wire Line
 	2400 6700 2400 6950
 Connection ~ 2400 6950
 Wire Wire Line
@@ -874,8 +844,6 @@ Text Label 2500 6950 0    50   ~ 0
 USB+
 Wire Wire Line
 	1700 6850 2050 6850
-Wire Wire Line
-	1700 6950 2050 6950
 $Comp
 L power:+5V #PWR08
 U 1 1 5FD93F14
@@ -917,11 +885,7 @@ F 3 "~" H 4400 5900 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 Wire Wire Line
-	4050 5800 4350 5800
-Wire Wire Line
 	4350 5800 4350 5700
-Wire Wire Line
-	4050 5900 4300 5900
 Wire Wire Line
 	4500 5900 5100 5900
 Text Label 4650 5900 0    50   ~ 0
@@ -1059,9 +1023,9 @@ Wire Wire Line
 Connection ~ 3750 3100
 Wire Wire Line
 	3750 3100 3750 3000
-Text Label 4550 3800 0    50   ~ 0
-SCSI_DB0
 Text Label 4550 3700 0    50   ~ 0
+SCSI_DB0
+Text Label 4550 3800 0    50   ~ 0
 SCSI_DB1
 Text Label 4550 3900 0    50   ~ 0
 SCSI_DB2
@@ -1451,4 +1415,44 @@ Wire Wire Line
 	7650 2500 7650 2350
 Wire Wire Line
 	7650 2350 8200 2350
+$Comp
+L Device:LED_Small_ALT D1
+U 1 1 5FEA5AEA
+P 3850 5800
+F 0 "D1" H 3850 6035 50  0000 C CNN
+F 1 "ACTIVITY LED" H 3850 5944 50  0000 C CNN
+F 2 "" V 3850 5800 50  0001 C CNN
+F 3 "~" V 3850 5800 50  0001 C CNN
+	1    3850 5800
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3950 5800 4350 5800
+Wire Wire Line
+	3600 5900 3600 5800
+Wire Wire Line
+	3600 5800 3750 5800
+Wire Wire Line
+	3600 5900 4300 5900
+Wire Wire Line
+	1700 7050 1800 7050
+Wire Wire Line
+	1800 7050 1800 7150
+Wire Wire Line
+	1700 6950 2050 6950
+Wire Wire Line
+	1950 6450 1950 6750
+Wire Wire Line
+	1700 6750 1950 6750
+$Comp
+L Connector:Conn_01x04_Male J3
+U 1 1 5FC2CB36
+P 1500 6850
+F 0 "J3" H 1606 7128 50  0000 C CNN
+F 1 "USB" H 1606 7037 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical" H 1500 6850 50  0001 C CNN
+F 3 "~" H 1500 6850 50  0001 C CNN
+	1    1500 6850
+	1    0    0    -1  
+$EndComp
 $EndSCHEMATC
