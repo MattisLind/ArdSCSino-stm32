@@ -3,17 +3,24 @@
  */
 #include <SPI.h>
 #include "SdFat.h"
+#define PARITY 1
+//#define DEBUG 1
 
 //ENABLE_EXTENDED_TRANSFER_CLASSを1に設定する
 //libraries/SdFat/SdFatConfig.h
 SPIClass SPI_1(1);
 SdFatEX  SD(&SPI_1);
-
+#ifdef DEBUG 
+#define LOG(XX)     Serial.print(XX)
+#define LOGHEX(XX)  Serial.print(XX, HEX)
+#define LOGN(XX)    Serial.println(XX)
+#define LOGHEXN(XX) Serial.println(XX, HEX)
+#else 
 #define LOG(XX)     //Serial.print(XX)
 #define LOGHEX(XX)  //Serial.print(XX, HEX)
 #define LOGN(XX)    //Serial.println(XX)
 #define LOGHEXN(XX) //Serial.println(XX, HEX)
-
+#endif
 #define high 0
 #define low 1
 
@@ -74,35 +81,42 @@ inline byte readIO(void)
  */
 inline void writeIO(byte v)
 {
+  #ifdef PARITY
   GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~v) <<8) )| parity(v) ;
+  #else
+  GPIOB->regs->ODR = GPIOB->regs->ODR & 0x00ff;
+  #endif
 }
 
 /*
  * 初期化.
  *  パリティチェック
  */
+
+#ifdef PARITY 
 inline int parity(byte val) {
   val ^= val >> 4;
   val ^= val >> 2;
   val ^= val >> 1;
   return val & 0x00000001;
 }
-
+#endif
 /*
  * 初期化.
  *  バスの初期化、PINの向きの設定を行う
  */
 void setup()
 {
-  // PA15 / PB3 / PB4 が使えない
+  // PA15 / PB3 / PB4 is needed.
   // But only disable JTAG not SWD
   afio_cfg_debug_ports(AFIO_DEBUG_SW_ONLY);
 
   //シリアル初期化
-  //Serial.begin(9600);
-  //while (!Serial);
-
-  //PINの初期化
+  #ifdef DEBUG
+  Serial.begin(9600);
+  while (!Serial);
+  #endif
+  // Activity LED
   gpio_mode(LED, GPIO_OUTPUT_OD);
   blinkLED(500);
 
@@ -131,18 +145,24 @@ void setup()
 
   //RSTピンの状態がHIGHからLOWに変わったときに発生
   attachInterrupt(RST, onBusReset, FALLING);
-  
+
+  // Start up the SD card
   if(!SD.begin(SD_CS,SPI_FULL_SPEED)) {
+    #ifdef DEBUG
     Serial.println("SD initialization failed!");
+    #endif
     signalErrorCode(1);
   }
-  //HDイメージファイル
+  //Open the image file
   m_file = SD.open(HDIMG_FILE, O_RDWR);
   if(!m_file) {
+    #ifdef DEBUG
     Serial.println("Error: open hdimg");
+    #endif
     signalErrorCode(2);
   }
   m_fileSize = m_file.size();
+  #ifdef DEBUG
   Serial.println("Found Valid HD Image File.");
   Serial.print(m_fileSize);
   Serial.println("byte");
@@ -150,6 +170,7 @@ void setup()
   Serial.println("KB");
   Serial.print(m_fileSize / 1024 / 1024);
   Serial.println("MB");
+  #endif
 }
 
 
