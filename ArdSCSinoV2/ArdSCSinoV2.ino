@@ -16,6 +16,8 @@ SdFatEX  SD(&SPI_1);
 
 #define high 0
 #define low 1
+#define active   1
+#define inactive 0
 
 #define isHigh(XX) ((XX) == high)
 #define isLow(XX) ((XX) != high)
@@ -47,6 +49,57 @@ SdFatEX  SD(&SPI_1);
 #define SD_CS     PA4      // SDCARD:CS
 #define LED       PC13     // LED
 
+// GPIOレジスタポート
+#define PAREG GPIOA->regs
+#define PBREG GPIOB->regs
+
+// 仮想ピン（Arduio互換は遅いのでMCU依存にして）
+#define PA(BIT)       (BIT)
+#define PB(BIT)       (BIT+16)
+// 仮想ピンのデコード
+#define GPIOREG(VPIN)    ((VPIN)>=16?PBREG:PAREG)
+#define BITMASK(VPIN) (1<<((VPIN)&15))
+
+#define vATN       PA(8)      // SCSI:ATN
+#define vBSY       PA(9)      // SCSI:BSY
+#define vACK       PA(10)     // SCSI:ACK
+#define vRST       PA(15)     // SCSI:RST
+#define vMSG       PB(3)      // SCSI:MSG
+#define vSEL       PB(4)      // SCSI:SEL
+#define vCD        PB(5)      // SCSI:C/D
+#define vREQ       PB(6)      // SCSI:REQ
+#define vIO        PB(7)      // SCSI:I/O
+#define vSD_CS     PA(4)      // SDCARD:CS
+
+// SCSI 出力ピン制御 : opendrain active LOW (direct pin drive)
+#define SCSI_OUT(VPIN,ACTIVE) { GPIOREG(VPIN)->BSRR = BITMASK(VPIN)<<((ACTIVE)?16:0); }
+
+// SCSI 入力ピン確認(inactive=0,avtive=1)
+#define SCSI_IN(VPIN) ((~GPIOREG(VPIN)->IDR>>(VPIN&15))&1)
+
+// GPIO mode
+// IN , FLOAT      : 4
+// IN , PU/PD      : 8
+// OUT, PUSH/PULL  : 3
+// OUT, OD         : 1
+//#define DB_MODE_OUT 3
+#define DB_MODE_OUT 1
+#define DB_MODE_IN  8
+
+// DB,DPを出力モードにする
+#define SCSI_DB_OUTPUT() { PBREG->CRL=(PBREG->CRL &0xfffffff0)|DB_MODE_OUT; PBREG->CRH = 0x11111111*DB_MODE_OUT; }
+// DB,DPを入力モードにする
+#define SCSI_DB_INPUT()  { PBREG->CRL=(PBREG->CRL &0xfffffff0)|DB_MODE_IN ; PBREG->CRH = 0x11111111*DB_MODE_IN;  }
+
+// BSYだけ出力をON にする
+#define SCSI_BSY_ACTIVE()      { gpio_mode(BSY, GPIO_OUTPUT_OD); SCSI_OUT(vBSY,  active) }
+// BSY,REQ,MSG,CD,IO 出力をON にする (ODの場合は変更不要）
+#define SCSI_TARGET_ACTIVE()   { }
+// BSY,REQ,MSG,CD,IO 出力をOFFにする、BSYは最後、入力に
+#define SCSI_TARGET_INACTIVE() { SCSI_OUT(vREQ,inactive); SCSI_OUT(vMSG,inactive); SCSI_OUT(vCD,inactive);SCSI_OUT(vIO,inactive); SCSI_OUT(vBSY,inactive); gpio_mode(BSY, GPIO_INPUT_PU); }
+
+
+
 #define SCSIID    0                 // SCSI-ID 
 
 #define BLOCKSIZE 512               // 1BLOCKサイズ
@@ -60,6 +113,30 @@ byte          m_buf[BLOCKSIZE];     // 汎用バッファ
 
 int           m_msc;
 bool          m_msb[256];
+
+// パリティービット生成
+#define PTY(V)   (1^((V)^((V)>>1)^((V)>>2)^((V)>>3)^((V)>>4)^((V)>>5)^((V)>>6)^((V)>>7))&1)
+
+// データバイト to BSRRレジスタ設定値変換テーブル
+// BSRR[31:24] =  DB[7:0]
+// BSRR[   16] =  PTY(DB)
+// BSRR[15: 8] = ~DB[7:0]
+// BSRR[    0] = ~PTY(DB)
+
+// DBPのセット、REQ=inactiveにする
+#define DBP(D)    ((((((uint32_t)(D)<<8)|PTY(D))*0x00010001)^0x0000ff01)|BITMASK(vREQ))
+
+#define DBP8(D)   DBP(D),DBP(D+1),DBP(D+2),DBP(D+3),DBP(D+4),DBP(D+5),DBP(D+6),DBP(D+7)
+#define DBP32(D)  DBP8(D),DBP8(D+8),DBP8(D+16),DBP8(D+24)
+
+// DBのセット,DPのセット,REQ=H(inactrive) を同時に行うBSRRレジスタ制御値
+static const uint32_t db_bsrr[256]={
+  DBP32(0x00),DBP32(0x20),DBP32(0x40),DBP32(0x60),
+  DBP32(0x80),DBP32(0xA0),DBP32(0xC0),DBP32(0xE0)
+};
+// パリティービット取得
+#define PARITY(DB) (db_bsrr[DB]&1)
+
 
 /*
  * IO読み込み.
@@ -337,7 +414,112 @@ void writeDataPhase(int len, byte* p)
   }
 }
 
-/* 
+/*
+
+void writeDataPhaseSD(uint32_t adds, uint32_t len)
+{
+  LOGN("DATAIN PHASE(SD)");
+  uint32_t pos = adds * BLOCKSIZE;
+  m_file.seek(pos);
+
+  SCSI_OUT(vMSG,inactive) //  gpio_write(MSG, low);
+  SCSI_OUT(vCD ,inactive) //  gpio_write(CD, low);
+  SCSI_OUT(vIO ,  active) //  gpio_write(IO, high);
+  for(uint32_t i = 0; i < len; i++) {
+      // 非同期リードにすれば速くなるんだけど...
+    m_file.read(m_buf, BLOCKSIZE);
+
+
+//#define REQ_ON() SCSI_OUT(vREQ,active)
+#define REQ_ON() (*db_dst = BITMASK(vREQ)<<16)
+#define FETCH_SRC()   (src_byte = *srcptr++)
+#define FETCH_BSRR_DB() (bsrr_val = bsrr_tbl[src_byte])
+#define REQ_OFF_DB_SET(BSRR_VAL) *db_dst = BSRR_VAL
+#define WAIT_ACK_ACTIVE()   while(!m_isBusReset && !SCSI_IN(vACK))
+#define WAIT_ACK_INACTIVE() do{ if(m_isBusReset) return; }while(SCSI_IN(vACK)) 
+
+    SCSI_DB_OUTPUT()
+    register byte *srcptr= m_buf;                 // ソースバッファ
+    register byte *endptr= m_buf +  BLOCKSIZE; // 終了ポインタ
+    
+    /*register*/  /*byte src_byte;                       // 送信データバイト
+    register const uint32_t *bsrr_tbl = db_bsrr;  // BSRRに変換するテーブル
+    register uint32_t bsrr_val;                   // 出力するBSRR値(DB,DBP,REQ=ACTIVE)
+    register volatile uint32_t *db_dst = &(GPIOB->regs->BSRR); // 出力ポート
+
+    // prefetch & 1st out
+    FETCH_SRC();
+    FETCH_BSRR_DB();
+    REQ_OFF_DB_SET(bsrr_val);
+    // DB.set to REQ.F setup 100ns max (DTC-510B)
+    // ここには多少のウェイトがあったほうがいいかも
+    //　WAIT_ACK_INACTIVE();
+    do{
+      // 0
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      // ACK.F  to REQ.R       500ns typ. (DTC-510B)
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 1
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 2
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 3
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 4
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 5
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 6
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+      // 7
+      REQ_ON();
+      FETCH_SRC();
+      FETCH_BSRR_DB();
+      WAIT_ACK_ACTIVE();
+      REQ_OFF_DB_SET(bsrr_val);
+      WAIT_ACK_INACTIVE();
+    }while(srcptr < endptr);
+    SCSI_DB_INPUT()
+  }
+}
+
+*/
+
+/*
  * データインフェーズ.
  *  SDカードからの読み込みながら len ブロック送信する。
  */
@@ -364,11 +546,45 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
   }
 }
 
+
+void readDataPhaseSD(uint32_t adds, uint32_t len)
+{
+  LOGN("DATAOUT PHASE(SD)");
+  uint32_t pos = adds * BLOCKSIZE;
+  m_file.seek(pos);
+  SCSI_OUT(vMSG,inactive) //  gpio_write(MSG, low);
+  SCSI_OUT(vCD ,inactive) //  gpio_write(CD, low);
+  SCSI_OUT(vIO ,inactive) //  gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
+  for(uint32_t i = 0; i < len; i++) {
+  register byte *dstptr= m_buf;
+  register byte *endptr= m_buf + BLOCKSIZE;
+
+    for(dstptr=m_buf;dstptr<endptr;dstptr+=8) {
+      dstptr[0] = readHandshake();
+      dstptr[1] = readHandshake();
+      dstptr[2] = readHandshake();
+      dstptr[3] = readHandshake();
+      dstptr[4] = readHandshake();
+      dstptr[5] = readHandshake();
+      dstptr[6] = readHandshake();
+      dstptr[7] = readHandshake();
+      if(m_isBusReset) {
+        return;
+      }
+    }
+    m_file.write(m_buf, BLOCKSIZE);
+  }
+  m_file.flush();
+}
+
+
+
 /*
  * データアウトフェーズ.
  *  len ブロック読み込みながら SDカードへ書き込む。
  */
-void readDataPhaseSD(uint32_t adds, uint32_t len)
+/*void readDataPhaseSD(uint32_t adds, uint32_t len)
 {
   LOGN("DATAOUT PHASE(SD)");
   uint32_t pos = adds * BLOCKSIZE;
@@ -387,7 +603,7 @@ void readDataPhaseSD(uint32_t adds, uint32_t len)
     m_file.write(m_buf, BLOCKSIZE);
   }
   m_file.flush();
-}
+}*/
 
 /*
  * INQUIRY コマンド処理.
