@@ -527,6 +527,8 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
 {
   register volatile uint32_t *GPIOBBSRR = &(GPIOB->regs->BSRR);
   register const uint32_t *bsrr_tbl = db_bsrr;
+  register volatile uint32_t *GPIOAIDR = &(GPIOA->regs->IDR);
+  register volatile bool * m_isBusResetPtr = &m_isBusReset;
   LOGN("DATAIN PHASE(SD)");
   uint32_t pos = adds * BLOCKSIZE;
   m_file.seek(pos);
@@ -543,45 +545,31 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
         register uint8_t src = (uint8_t) wordData;
         *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
-        while(GPIOA->regs->IDR & (1 << 10)) {
-          if(m_isBusReset) return;
-        }
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
-        while(!(GPIOA->regs->IDR & (1<<10))) {
-          if(m_isBusReset) return;
-        }
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
         src = (uint8_t) (wordData >> 8);
         *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
-        while(GPIOA->regs->IDR & (1 << 10)) {
-          if(m_isBusReset) return;
-        }
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
-        while(!(GPIOA->regs->IDR & (1<<10))) {
-          if(m_isBusReset) return;
-        }
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
         src = (uint8_t) (wordData >> 16);
         *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
-        while(GPIOA->regs->IDR & (1 << 10)) {
-          if(m_isBusReset) return;
-        }
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
-        while(!(GPIOA->regs->IDR & (1<<10))) {
-          if(m_isBusReset) return;
-        }
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
         src = (uint8_t) (wordData >> 24);
         *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
-        while(GPIOA->regs->IDR & (1 << 10)) {
-          if(m_isBusReset) return;
-        }
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
-        while(!(GPIOA->regs->IDR & (1<<10))) {
-          if(m_isBusReset) return;
+        while(!(*GPIOAIDR & (1<<10))) {
+          if(*m_isBusResetPtr) return;
         }
 
     }
