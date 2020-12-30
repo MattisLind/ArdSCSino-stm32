@@ -540,82 +540,305 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
   
   for(uint32_t i = 0; i < len; i++) {
     m_file.read(m_buf, BLOCKSIZE);
-    for(int j = 0; j < BLOCKSIZE; j+=8) {
+    for(int j = 0; j < BLOCKSIZE; j+=128) {
         register uint32_t wordData = * ((uint32_t *) (m_buf+j));
         register uint8_t src = (uint8_t) wordData;
-        register uint32_t tmp;
+        register uint32_t tmp =  bsrr_tbl[src];
+
+        #define OTHERBYTES(shift)   *GPIOBBSRR = tmp; \
+                                    *GPIOBBSRR = 1 << 22; \
+                                    while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr); \
+                                    *GPIOBBSRR = 1<<6; \
+                                    src = (uint8_t) (wordData >> shift); \
+                                    tmp = bsrr_tbl[src]; \
+                                    while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+        #define FOURTHBYTE(offset) *GPIOBBSRR = tmp; \
+                                   *GPIOBBSRR = 1 << 22; \
+                                    while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr); \
+                                   *GPIOBBSRR = 1<<6; \
+                                   wordData = * ((uint32_t *) (m_buf+j+offset)); \
+                                   src = (uint8_t) (wordData); \
+                                   tmp = bsrr_tbl[src]; \
+                                   while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr)
+                                   
+         #define LASTBYTE          *GPIOBBSRR = tmp; \
+                                   *GPIOBBSRR = 1 << 22; \
+                                   while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr); \
+                                   *GPIOBBSRR = 1<<6; \
+                                   while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);       
+                                   
+                                   
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(4);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(8);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(12);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(16);
 
         // First Byte First word
-        *GPIOBBSRR = bsrr_tbl[src];
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        src = (uint8_t) (wordData >> 8);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        OTHERBYTES(8);
         // Second Byte First Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        src = (uint8_t) (wordData >> 16);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        OTHERBYTES(16);
          // Third Byte First Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        src = (uint8_t) (wordData >> 24);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        OTHERBYTES(24);
         // Fourth Byte First Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        wordData = * ((uint32_t *) (m_buf+j+4));
-        src = (uint8_t) (wordData);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        FOURTHBYTE(20);
         // First Byte Second Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        src = (uint8_t) (wordData >> 8);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        OTHERBYTES(8);
         // Second Byte Second Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        src = (uint8_t) (wordData >> 16);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        OTHERBYTES(16);
         // Third Byte Second Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        src = (uint8_t) (wordData >> 24);
-        tmp = bsrr_tbl[src];
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
+        OTHERBYTES(24);
         // Fourth Byte Second Word
-        *GPIOBBSRR = tmp;
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);       
+        FOURTHBYTE(24);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(28);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(32);
+
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(36);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(40);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(44);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(48);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(52);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(56);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(60);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(64);
+
+
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(68);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(72);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(76);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(80);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(84);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(88);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(92);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(96);
+
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(100);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(104);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(108);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(112);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(116);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(120);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(124);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        LASTBYTE;
         if(*m_isBusResetPtr) return;
+
+
+        
     }
   }
 }
