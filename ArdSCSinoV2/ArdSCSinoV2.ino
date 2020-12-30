@@ -540,10 +540,12 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
   
   for(uint32_t i = 0; i < len; i++) {
     m_file.read(m_buf, BLOCKSIZE);
-    for(int j = 0; j < BLOCKSIZE; j+=4) {
+    for(int j = 0; j < BLOCKSIZE; j+=8) {
         register uint32_t wordData = * ((uint32_t *) (m_buf+j));
         register uint8_t src = (uint8_t) wordData;
         register uint32_t tmp;
+
+        // First Byte First word
         *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
@@ -552,15 +554,16 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
         tmp = bsrr_tbl[src];
         while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
-
+        // Second Byte First Word
         *GPIOBBSRR = tmp;
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
-        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
         src = (uint8_t) (wordData >> 16);
         tmp = bsrr_tbl[src];
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+
+         // Third Byte First Word
         *GPIOBBSRR = tmp;
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
@@ -569,12 +572,49 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
         tmp = bsrr_tbl[src];
         while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
-
+        // Fourth Byte First Word
         *GPIOBBSRR = tmp;
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
+        wordData = * ((uint32_t *) (m_buf+j+4));
+        src = (uint8_t) (wordData);
+        tmp = bsrr_tbl[src];
         while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+
+        // First Byte Second Word
+        *GPIOBBSRR = tmp;
+        *GPIOBBSRR = 1 << 22;
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
+        *GPIOBBSRR = 1<<6;
+        src = (uint8_t) (wordData >> 8);
+        tmp = bsrr_tbl[src];
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+
+        // Second Byte Second Word
+        *GPIOBBSRR = tmp;
+        *GPIOBBSRR = 1 << 22;
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
+        *GPIOBBSRR = 1<<6;
+        src = (uint8_t) (wordData >> 16);
+        tmp = bsrr_tbl[src];
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+
+        // Third Byte Second Word
+        *GPIOBBSRR = tmp;
+        *GPIOBBSRR = 1 << 22;
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
+        *GPIOBBSRR = 1<<6;
+        src = (uint8_t) (wordData >> 24);
+        tmp = bsrr_tbl[src];
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+
+        // Fourth Byte Second Word
+        *GPIOBBSRR = tmp;
+        *GPIOBBSRR = 1 << 22;
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
+        *GPIOBBSRR = 1<<6;
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);       
         if(*m_isBusResetPtr) return;
     }
   }
