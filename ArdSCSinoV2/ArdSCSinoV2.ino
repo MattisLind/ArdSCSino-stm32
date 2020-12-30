@@ -352,15 +352,15 @@ void onBusReset(void)
 inline byte readHandshake(void)
 {
   
-  gpio_write(REQ, high);
-  while(isLow(gpio_read(ACK))) {
+  GPIOB->regs->BRR = 1 << 6;
+  while(GPIOA->regs->IDR & (1 << 10)) {
     if(m_isBusReset) {
       return 0;
     }
   }
   byte r = readIO();
-  gpio_write(REQ, low);
-  while(isHigh(gpio_read(ACK))) {
+  GPIOB->regs->BSRR = 1<<6;
+  while(!(GPIOA->regs->IDR & (1<<10))) {
     if(m_isBusReset) {
       return 0;
     }
@@ -843,6 +843,12 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
   }
 }
 
+#define READONEBYTE(index)  GPIOB->regs->BRR = 1 << 6;\
+  while(GPIOA->regs->IDR & (1 << 10) && !m_isBusReset);\
+  dstptr[index] = (uint8_t) (~(GPIOB->regs->IDR >> 8));\
+  GPIOB->regs->BSRR = 1<<6;\
+  while(!(GPIOA->regs->IDR & (1<<10)) && !m_isBusReset); 
+
 
 void readDataPhaseSD(uint32_t adds, uint32_t len)
 {
@@ -857,15 +863,135 @@ void readDataPhaseSD(uint32_t adds, uint32_t len)
   register byte *dstptr= m_buf;
   register byte *endptr= m_buf + BLOCKSIZE;
 
-    for(dstptr=m_buf;dstptr<endptr;dstptr+=8) {
-      dstptr[0] = readHandshake();
-      dstptr[1] = readHandshake();
-      dstptr[2] = readHandshake();
-      dstptr[3] = readHandshake();
-      dstptr[4] = readHandshake();
-      dstptr[5] = readHandshake();
-      dstptr[6] = readHandshake();
-      dstptr[7] = readHandshake();
+    for(dstptr=m_buf;dstptr<endptr;dstptr+=128) {
+      READONEBYTE(0)
+      READONEBYTE(1)
+      READONEBYTE(2)
+      READONEBYTE(3)
+      READONEBYTE(4)
+      READONEBYTE(5)
+      READONEBYTE(6)
+      READONEBYTE(7)
+      READONEBYTE(8)
+      READONEBYTE(9)
+      READONEBYTE(10)
+      READONEBYTE(11)
+      READONEBYTE(12)
+      READONEBYTE(13)
+      READONEBYTE(14)
+      READONEBYTE(15)
+      READONEBYTE(16)
+      READONEBYTE(17)
+      READONEBYTE(18)
+      READONEBYTE(19)
+      READONEBYTE(20)
+      READONEBYTE(21)
+      READONEBYTE(22)
+      READONEBYTE(23)
+      READONEBYTE(24)
+      READONEBYTE(25)
+      READONEBYTE(26)
+      READONEBYTE(27)
+      READONEBYTE(28)
+      READONEBYTE(29)
+      READONEBYTE(30)
+      READONEBYTE(31)
+      READONEBYTE(32)
+      READONEBYTE(33)
+      READONEBYTE(34)
+      READONEBYTE(35)
+      READONEBYTE(36)
+      READONEBYTE(37)
+      READONEBYTE(38)
+      READONEBYTE(39)
+      READONEBYTE(40)
+      READONEBYTE(41)
+      READONEBYTE(42)
+      READONEBYTE(43)
+      READONEBYTE(44)
+      READONEBYTE(45)
+      READONEBYTE(46)
+      READONEBYTE(47)
+      READONEBYTE(48)
+      READONEBYTE(49)
+      READONEBYTE(50)
+      READONEBYTE(51)
+      READONEBYTE(52)
+      READONEBYTE(53)
+      READONEBYTE(54)
+      READONEBYTE(55)
+      READONEBYTE(56)
+      READONEBYTE(57)
+      READONEBYTE(58)
+      READONEBYTE(59)
+      READONEBYTE(60)
+      READONEBYTE(61)
+      READONEBYTE(62)
+      READONEBYTE(63)
+      READONEBYTE(64)
+      READONEBYTE(65)
+      READONEBYTE(66)
+      READONEBYTE(67)
+      READONEBYTE(68)
+      READONEBYTE(69)
+      READONEBYTE(70)
+      READONEBYTE(71)
+      READONEBYTE(72)
+      READONEBYTE(73)
+      READONEBYTE(74)
+      READONEBYTE(75)
+      READONEBYTE(76)
+      READONEBYTE(77)
+      READONEBYTE(78)
+      READONEBYTE(79)
+      READONEBYTE(80)
+      READONEBYTE(81)
+      READONEBYTE(82)
+      READONEBYTE(83)
+      READONEBYTE(84)
+      READONEBYTE(85)
+      READONEBYTE(86)
+      READONEBYTE(87)
+      READONEBYTE(88)
+      READONEBYTE(89)
+      READONEBYTE(90)
+      READONEBYTE(91)
+      READONEBYTE(92)
+      READONEBYTE(93)
+      READONEBYTE(94)
+      READONEBYTE(95)
+      READONEBYTE(96)
+      READONEBYTE(97)
+      READONEBYTE(98)
+      READONEBYTE(99)
+      READONEBYTE(100)
+      READONEBYTE(101)
+      READONEBYTE(102)
+      READONEBYTE(103)
+      READONEBYTE(104)
+      READONEBYTE(105)
+      READONEBYTE(106)
+      READONEBYTE(107)
+      READONEBYTE(108)
+      READONEBYTE(109)
+      READONEBYTE(110)
+      READONEBYTE(111)
+      READONEBYTE(112)
+      READONEBYTE(113)
+      READONEBYTE(114)
+      READONEBYTE(115)
+      READONEBYTE(116)
+      READONEBYTE(117)
+      READONEBYTE(118)
+      READONEBYTE(119)
+      READONEBYTE(120)
+      READONEBYTE(121)
+      READONEBYTE(122)
+      READONEBYTE(123)
+      READONEBYTE(124)
+      READONEBYTE(125)
+      READONEBYTE(126)
+      READONEBYTE(127)
       if(m_isBusReset) {
         return;
       }
