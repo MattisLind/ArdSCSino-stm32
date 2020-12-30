@@ -538,9 +538,10 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
   
   for(uint32_t i = 0; i < len; i++) {
     m_file.read(m_buf, BLOCKSIZE);
-    for(int j = 0; j < (BLOCKSIZE); j++) {
-        *GPIOBBSRR = bsrr_tbl[m_buf[j]];
-        //GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
+    for(int j = 0; j < BLOCKSIZE; j+=4) {
+        register uint32_t wordData = * ((uint32_t *) (m_buf+j));
+        register uint8_t src = (uint8_t) wordData;
+        *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
         while(GPIOA->regs->IDR & (1 << 10)) {
           if(m_isBusReset) return;
@@ -549,42 +550,40 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
         while(!(GPIOA->regs->IDR & (1<<10))) {
           if(m_isBusReset) return;
         }
-/*
-                //*GPIOBBSRR = bsrr_tbl[~m_buf[j]];
-        GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
-        GPIOB->regs->BRR = 1 << 6;
+
+        src = (uint8_t) (wordData >> 8);
+        *GPIOBBSRR = bsrr_tbl[src];
+        *GPIOBBSRR = 1 << 22;
         while(GPIOA->regs->IDR & (1 << 10)) {
           if(m_isBusReset) return;
         }
-        GPIOB->regs->BSRR = 1<<6;
+        *GPIOBBSRR = 1<<6;
         while(!(GPIOA->regs->IDR & (1<<10))) {
           if(m_isBusReset) return;
         }
 
-        //*GPIOBBSRR = bsrr_tbl[~m_buf[j]];
-        GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
-        GPIOB->regs->BRR = 1 << 6;
+        src = (uint8_t) (wordData >> 16);
+        *GPIOBBSRR = bsrr_tbl[src];
+        *GPIOBBSRR = 1 << 22;
         while(GPIOA->regs->IDR & (1 << 10)) {
           if(m_isBusReset) return;
         }
-        GPIOB->regs->BSRR = 1<<6;
+        *GPIOBBSRR = 1<<6;
         while(!(GPIOA->regs->IDR & (1<<10))) {
           if(m_isBusReset) return;
         }
 
-
-        //*GPIOBBSRR = bsrr_tbl[~m_buf[j]];
-        GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
-        GPIOB->regs->BRR = 1 << 6;
+        src = (uint8_t) (wordData >> 24);
+        *GPIOBBSRR = bsrr_tbl[src];
+        *GPIOBBSRR = 1 << 22;
         while(GPIOA->regs->IDR & (1 << 10)) {
           if(m_isBusReset) return;
         }
-        GPIOB->regs->BSRR = 1<<6;
+        *GPIOBBSRR = 1<<6;
         while(!(GPIOA->regs->IDR & (1<<10))) {
           if(m_isBusReset) return;
         }
 
-*/
     }
   }
 }
