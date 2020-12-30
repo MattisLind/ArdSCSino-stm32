@@ -448,21 +448,21 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
     register volatile uint32_t *db_dst = &(GPIOB->regs->BSRR); // 出力ポート
 
     // prefetch & 1st out
-    FETCH_SRC();
-    FETCH_BSRR_DB();
-    REQ_OFF_DB_SET(bsrr_val);
+    src_byte = *srcptr++;
+    (bsrr_val = bsrr_tbl[src_byte];
+    *db_dst = bsrr_val;
     // DB.set to REQ.F setup 100ns max (DTC-510B)
     // ここには多少のウェイトがあったほうがいいかも
     //　WAIT_ACK_INACTIVE();
     do{
       // 0
-      REQ_ON();
-      FETCH_SRC();
-      FETCH_BSRR_DB();
-      WAIT_ACK_ACTIVE();
+      *db_dst = BITMASK(vREQ)<<16;
+      src_byte = *srcptr++;
+      bsrr_val = bsrr_tbl[src_byte];
+      while(!m_isBusReset && !SCSI_IN(vACK));
       // ACK.F  to REQ.R       500ns typ. (DTC-510B)
-      REQ_OFF_DB_SET(bsrr_val);
-      WAIT_ACK_INACTIVE();
+      *db_dst = bsrr_val;
+      do{ if(m_isBusReset) return; }while(SCSI_IN(vACK));
       // 1
       REQ_ON();
       FETCH_SRC();
@@ -516,8 +516,8 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
     SCSI_DB_INPUT()
   }
 }
-
 */
+
 
 /*
  * データインフェーズ.
@@ -525,23 +525,66 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
  */
 void writeDataPhaseSD(uint32_t adds, uint32_t len)
 {
+  register volatile uint32_t *GPIOBBSRR = &(GPIOB->regs->BSRR);
+  register const uint32_t *bsrr_tbl = db_bsrr;
   LOGN("DATAIN PHASE(SD)");
   uint32_t pos = adds * BLOCKSIZE;
   m_file.seek(pos);
   gpio_write(MSG, low);
   gpio_write(CD, low);
   gpio_write(IO, high);
-    GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
-  //ポート設定レジスタ（上位）
+  GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
   GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
-
+  
   for(uint32_t i = 0; i < len; i++) {
     m_file.read(m_buf, BLOCKSIZE);
-    for(int j = 0; j < BLOCKSIZE; j++) {
-      if(m_isBusReset) {
-        return;
-      }
-      writeHandshake(m_buf[j]);
+    for(int j = 0; j < (BLOCKSIZE); j++) {
+        *GPIOBBSRR = bsrr_tbl[m_buf[j]];
+        //GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
+        *GPIOBBSRR = 1 << 22;
+        while(GPIOA->regs->IDR & (1 << 10)) {
+          if(m_isBusReset) return;
+        }
+        *GPIOBBSRR = 1<<6;
+        while(!(GPIOA->regs->IDR & (1<<10))) {
+          if(m_isBusReset) return;
+        }
+/*
+                //*GPIOBBSRR = bsrr_tbl[~m_buf[j]];
+        GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
+        GPIOB->regs->BRR = 1 << 6;
+        while(GPIOA->regs->IDR & (1 << 10)) {
+          if(m_isBusReset) return;
+        }
+        GPIOB->regs->BSRR = 1<<6;
+        while(!(GPIOA->regs->IDR & (1<<10))) {
+          if(m_isBusReset) return;
+        }
+
+        //*GPIOBBSRR = bsrr_tbl[~m_buf[j]];
+        GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
+        GPIOB->regs->BRR = 1 << 6;
+        while(GPIOA->regs->IDR & (1 << 10)) {
+          if(m_isBusReset) return;
+        }
+        GPIOB->regs->BSRR = 1<<6;
+        while(!(GPIOA->regs->IDR & (1<<10))) {
+          if(m_isBusReset) return;
+        }
+
+
+        //*GPIOBBSRR = bsrr_tbl[~m_buf[j]];
+        GPIOB->regs->ODR = (GPIOB->regs->ODR & 0x00fe) | (0xff00 & ((~m_buf[j]) <<8) )| parity(m_buf[j]) ;
+        GPIOB->regs->BRR = 1 << 6;
+        while(GPIOA->regs->IDR & (1 << 10)) {
+          if(m_isBusReset) return;
+        }
+        GPIOB->regs->BSRR = 1<<6;
+        while(!(GPIOA->regs->IDR & (1<<10))) {
+          if(m_isBusReset) return;
+        }
+
+*/
     }
   }
 }
