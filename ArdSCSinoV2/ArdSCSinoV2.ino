@@ -543,35 +543,39 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
     for(int j = 0; j < BLOCKSIZE; j+=4) {
         register uint32_t wordData = * ((uint32_t *) (m_buf+j));
         register uint8_t src = (uint8_t) wordData;
+        register uint32_t tmp;
         *GPIOBBSRR = bsrr_tbl[src];
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
+        src = (uint8_t) (wordData >> 8);
+        tmp = bsrr_tbl[src];
         while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
-        src = (uint8_t) (wordData >> 8);
-        *GPIOBBSRR = bsrr_tbl[src];
+
+        *GPIOBBSRR = tmp;
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
         while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
 
         src = (uint8_t) (wordData >> 16);
-        *GPIOBBSRR = bsrr_tbl[src];
+        tmp = bsrr_tbl[src];
+        *GPIOBBSRR = tmp;
+        *GPIOBBSRR = 1 << 22;
+        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
+        *GPIOBBSRR = 1<<6;
+        src = (uint8_t) (wordData >> 24);
+        tmp = bsrr_tbl[src];
+        while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
+
+
+        *GPIOBBSRR = tmp;
         *GPIOBBSRR = 1 << 22;
         while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
         *GPIOBBSRR = 1<<6;
         while(!(*GPIOAIDR & (1<<10)) && !*m_isBusResetPtr);
-
-        src = (uint8_t) (wordData >> 24);
-        *GPIOBBSRR = bsrr_tbl[src];
-        *GPIOBBSRR = 1 << 22;
-        while(*GPIOAIDR & (1 << 10) && !*m_isBusResetPtr);
-        *GPIOBBSRR = 1<<6;
-        while(!(*GPIOAIDR & (1<<10))) {
-          if(*m_isBusResetPtr) return;
-        }
-
+        if(*m_isBusResetPtr) return;
     }
   }
 }
