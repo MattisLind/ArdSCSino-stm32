@@ -42,7 +42,7 @@ SdFatEX  SD(&SPI_1);
 //#define DB5       PB13    // SCSI:DB5
 //#define DB6       PB14    // SCSI:DB6
 //#define DB7       PB15    // SCSI:DB7
-//#define DBP       PB0     // SCSI:DBP
+//#define DBP       PA8     // SCSI:DBP
 
 #define ATN       PA15      // SCSI:ATN
 #define BSY       PB3      // SCSI:BSY
@@ -326,12 +326,355 @@ void writeDataPhase(int len, byte* p)
     writeHandshake(p[i]);
   }
 }
+#define PA(BIT)       (BIT)
+#define PB(BIT)       (BIT+16)
+
+#define vREQ       PA(1)      // SCSI:REQ
+#define BITMASK(VPIN) (1<<((VPIN)&15))
+#define PTY(V)   (1^((V)^((V)>>1)^((V)>>2)^((V)>>3)^((V)>>4)^((V)>>5)^((V)>>6)^((V)>>7))&1)
+
+#define DBP(D)    ((((((uint32_t)(D)<<8)|PTY(D))*0x00010001)^0x0000ff01)|BITMASK(vREQ))
+
+#define DBP8(D)   DBP(D),DBP(D+1),DBP(D+2),DBP(D+3),DBP(D+4),DBP(D+5),DBP(D+6),DBP(D+7)
+#define DBP32(D)  DBP8(D),DBP8(D+8),DBP8(D+16),DBP8(D+24)
+
+// DBのセット,DPのセット,REQ=H(inactrive) を同時に行うBSRRレジスタ制御値
+static const uint32_t db_bsrr[256]={
+  DBP32(0x00),DBP32(0x20),DBP32(0x40),DBP32(0x60),
+  DBP32(0x80),DBP32(0xA0),DBP32(0xC0),DBP32(0xE0)
+};
+// パリティービット取得
+#define PARITY(DB) (db_bsrr[DB]&1)
+
+
+
+void writeDataPhaseSD(uint32_t adds, uint32_t len)
+{
+  register volatile uint32_t *GPIOBBSRR = &(GPIOB->regs->BSRR);
+  register volatile uint32_t *GPIOABSRR = &(GPIOA->regs->BSRR);
+  register const uint32_t *bsrr_tbl = db_bsrr;
+  register volatile uint32_t *GPIOBIDR = &(GPIOB->regs->IDR);
+  register volatile bool * m_isBusResetPtr = &m_isBusReset;
+  LOGN("DATAIN PHASE(SD)");
+  uint32_t pos = adds * BLOCKSIZE;
+  m_file.seek(pos);
+  gpio_write(MSG, low);
+  gpio_write(CD, low);
+  gpio_write(IO, high);
+  GPIOB->regs->CRL |= 0x00000003; // SET OUTPUT W/ PUPD on PA7-PB0 50MHz
+  GPIOB->regs->CRH = 0x33333333; // SET OUTPUT W/ PUPD on PB15-PB8 50MHz
+  
+  for(uint32_t i = 0; i < len; i++) {
+    m_file.read(m_buf, BLOCKSIZE);
+    for(int j = 0; j < BLOCKSIZE; j+=128) {
+        register uint32_t wordData = * ((uint32_t *) (m_buf+j));
+        register uint8_t src = (uint8_t) wordData;
+        register uint32_t tmp =  bsrr_tbl[src];
+
+        #define OTHERBYTES(shift)   *GPIOBBSRR = tmp; \
+                                    *GPIOABSRR = 1 << 17; \
+                                    while(*GPIOBIDR & (1 << 4) && !*m_isBusResetPtr); \
+                                    *GPIOABSRR = 1<<1; \ 
+                                    src = (uint8_t) (wordData >> shift); \
+                                    tmp = bsrr_tbl[src]; \
+                                    while(!(*GPIOBIDR & (1<<4)) && !*m_isBusResetPtr);
+        #define FOURTHBYTE(offset) *GPIOBBSRR = tmp; \
+                                   *GPIOABSRR = 1 << 17; \
+                                    while(*GPIOBIDR & (1 << 4) && !*m_isBusResetPtr); \
+                                   *GPIOABSRR = 1<<1; \
+                                   wordData = * ((uint32_t *) (m_buf+j+offset)); \
+                                   src = (uint8_t) (wordData); \
+                                   tmp = bsrr_tbl[src]; \
+                                   while(!(*GPIOBIDR & (1<<4)) && !*m_isBusResetPtr)
+                                   
+         #define LASTBYTE          *GPIOBBSRR = tmp; \
+                                   *GPIOABSRR = 1 << 17; \
+                                   while(*GPIOBIDR & (1 << 4) && !*m_isBusResetPtr); \
+                                   *GPIOABSRR = 1<<1; \
+                                   while(!(*GPIOBIDR & (1<<4)) && !*m_isBusResetPtr);       
+                                   
+                                   
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(4);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(8);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(12);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(16);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(20);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(24);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(28);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(32);
+
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(36);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(40);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(44);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(48);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(52);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(56);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(60);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(64);
+
+
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(68);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(72);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(76);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(80);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(84);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(88);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(92);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(96);
+
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(100);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(104);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(108);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        FOURTHBYTE(112);
+
+        // First Byte First word
+        OTHERBYTES(8);
+        // Second Byte First Word
+        OTHERBYTES(16);
+         // Third Byte First Word
+        OTHERBYTES(24);
+        // Fourth Byte First Word
+        FOURTHBYTE(116);
+        // First Byte Second Word
+        OTHERBYTES(8);
+        // Second Byte Second Word
+        OTHERBYTES(16);
+        // Third Byte Second Word
+        OTHERBYTES(24);
+        // Fourth Byte Second Word
+        FOURTHBYTE(120);
+        // First Byte Third word
+        OTHERBYTES(8);
+        // Second Byte Third Word
+        OTHERBYTES(16);
+         // Third Byte Third Word
+        OTHERBYTES(24);
+        // Fourth Byte Third Word
+        FOURTHBYTE(124);
+        // First Byte Fourth Word
+        OTHERBYTES(8);
+        // Second Byte Fourth Word
+        OTHERBYTES(16);
+        // Third Byte Fourth Word
+        OTHERBYTES(24);
+        // Fourth Byte Fourth Word
+        LASTBYTE;
+        if(*m_isBusResetPtr) return;
+
+
+        
+    }
+  }
+}
+
 
 /* 
  * データインフェーズ.
  *  SDカードからの読み込みながら len ブロック送信する。
  */
-void writeDataPhaseSD(uint32_t adds, uint32_t len)
+/*void writeDataPhaseSD(uint32_t adds, uint32_t len)
 {
   LOGN("DATAIN PHASE(SD)");
   uint32_t pos = adds * BLOCKSIZE;
@@ -350,13 +693,175 @@ void writeDataPhaseSD(uint32_t adds, uint32_t len)
       writeHandshake(m_buf[j]);
     }
   }
+}*/
+
+
+
+#define READONEBYTE(index)  GPIOA->regs->BRR = 1 << 1;\
+  while(GPIOB->regs->IDR & (1 << 4) && !m_isBusReset);\
+  dstptr[index] = (uint8_t) (~(GPIOB->regs->IDR >> 8));\
+  GPIOA->regs->BSRR = 1<<1;\
+  while(!(GPIOB->regs->IDR & (1<<4)) && !m_isBusReset);
+
+void readDataPhaseSD(uint32_t adds, uint32_t len)
+{
+  LOGN("DATAOUT PHASE(SD)");
+  uint32_t pos = adds * BLOCKSIZE;
+  m_file.seek(pos);
+  gpio_write(MSG, low);
+  gpio_write(CD, low);
+  gpio_write(IO, low);
+  GPIOB->regs->CRH = 0x88888888; // SET INPUT W/ PUPD on PB15-PB8
+  for(uint32_t i = 0; i < len; i++) {
+  register byte *dstptr= m_buf;
+  register byte *endptr= m_buf + BLOCKSIZE;
+
+    for(dstptr=m_buf;dstptr<endptr;dstptr+=128) {
+      READONEBYTE(0)
+      READONEBYTE(1)
+      READONEBYTE(2)
+      READONEBYTE(3)
+      READONEBYTE(4)
+      READONEBYTE(5)
+      READONEBYTE(6)
+      READONEBYTE(7)
+      READONEBYTE(8)
+      READONEBYTE(9)
+      READONEBYTE(10)
+      READONEBYTE(11)
+      READONEBYTE(12)
+      READONEBYTE(13)
+      READONEBYTE(14)
+      READONEBYTE(15)
+      READONEBYTE(16)
+      READONEBYTE(17)
+      READONEBYTE(18)
+      READONEBYTE(19)
+      READONEBYTE(20)
+      READONEBYTE(21)
+      READONEBYTE(22)
+      READONEBYTE(23)
+      READONEBYTE(24)
+      READONEBYTE(25)
+      READONEBYTE(26)
+      READONEBYTE(27)
+      READONEBYTE(28)
+      READONEBYTE(29)
+      READONEBYTE(30)
+      READONEBYTE(31)
+      READONEBYTE(32)
+      READONEBYTE(33)
+      READONEBYTE(34)
+      READONEBYTE(35)
+      READONEBYTE(36)
+      READONEBYTE(37)
+      READONEBYTE(38)
+      READONEBYTE(39)
+      READONEBYTE(40)
+      READONEBYTE(41)
+      READONEBYTE(42)
+      READONEBYTE(43)
+      READONEBYTE(44)
+      READONEBYTE(45)
+      READONEBYTE(46)
+      READONEBYTE(47)
+      READONEBYTE(48)
+      READONEBYTE(49)
+      READONEBYTE(50)
+      READONEBYTE(51)
+      READONEBYTE(52)
+      READONEBYTE(53)
+      READONEBYTE(54)
+      READONEBYTE(55)
+      READONEBYTE(56)
+      READONEBYTE(57)
+      READONEBYTE(58)
+      READONEBYTE(59)
+      READONEBYTE(60)
+      READONEBYTE(61)
+      READONEBYTE(62)
+      READONEBYTE(63)
+      READONEBYTE(64)
+      READONEBYTE(65)
+      READONEBYTE(66)
+      READONEBYTE(67)
+      READONEBYTE(68)
+      READONEBYTE(69)
+      READONEBYTE(70)
+      READONEBYTE(71)
+      READONEBYTE(72)
+      READONEBYTE(73)
+      READONEBYTE(74)
+      READONEBYTE(75)
+      READONEBYTE(76)
+      READONEBYTE(77)
+      READONEBYTE(78)
+      READONEBYTE(79)
+      READONEBYTE(80)
+      READONEBYTE(81)
+      READONEBYTE(82)
+      READONEBYTE(83)
+      READONEBYTE(84)
+      READONEBYTE(85)
+      READONEBYTE(86)
+      READONEBYTE(87)
+      READONEBYTE(88)
+      READONEBYTE(89)
+      READONEBYTE(90)
+      READONEBYTE(91)
+      READONEBYTE(92)
+      READONEBYTE(93)
+      READONEBYTE(94)
+      READONEBYTE(95)
+      READONEBYTE(96)
+      READONEBYTE(97)
+      READONEBYTE(98)
+      READONEBYTE(99)
+      READONEBYTE(100)
+      READONEBYTE(101)
+      READONEBYTE(102)
+      READONEBYTE(103)
+      READONEBYTE(104)
+      READONEBYTE(105)
+      READONEBYTE(106)
+      READONEBYTE(107)
+      READONEBYTE(108)
+      READONEBYTE(109)
+      READONEBYTE(110)
+      READONEBYTE(111)
+      READONEBYTE(112)
+      READONEBYTE(113)
+      READONEBYTE(114)
+      READONEBYTE(115)
+      READONEBYTE(116)
+      READONEBYTE(117)
+      READONEBYTE(118)
+      READONEBYTE(119)
+      READONEBYTE(120)
+      READONEBYTE(121)
+      READONEBYTE(122)
+      READONEBYTE(123)
+      READONEBYTE(124)
+      READONEBYTE(125)
+      READONEBYTE(126)
+      READONEBYTE(127)
+      if(m_isBusReset) {
+        return;
+      }
+    }
+    m_file.write(m_buf, BLOCKSIZE);
+  }
+  m_file.flush();
 }
+
+
+
 
 /*
  * データアウトフェーズ.
  *  len ブロック読み込みながら SDカードへ書き込む。
  */
-void readDataPhaseSD(uint32_t adds, uint32_t len)
+/* void readDataPhaseSD(uint32_t adds, uint32_t len)
 {
   LOGN("DATAOUT PHASE(SD)");
   uint32_t pos = adds * BLOCKSIZE;
@@ -376,7 +881,7 @@ void readDataPhaseSD(uint32_t adds, uint32_t len)
   }
   m_file.flush();
 }
-
+*/
 /*
  * INQUIRY コマンド処理.
  */
