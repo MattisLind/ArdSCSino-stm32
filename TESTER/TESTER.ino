@@ -1,25 +1,21 @@
 /*
-  Blink
 
-  Turns an LED on for one second, then off for one second, repeatedly.
+TESTER
 
-  Most Arduinos have an on-board LED you can control. On the UNO, MEGA and ZERO
-  it is attached to digital pin 13, on MKR1000 on pin 6. LED_BUILTIN is set to
-  the correct LED pin independent of which board is used.
-  If you want to know what pin the on-board LED is connected to on your Arduino
-  model, check the Technical Specs of your board at:
-  https://www.arduino.cc/en/Main/Products
+Connect 
+IMAGE_SEL0 - IMAGE_SEL1
+UNIT_SEL1 - UNIT_SEL2
+UNIT_SEL0 - ACTIVITY_LED
+SCSI DBP (18) - SCSI ATN (32)
+SCSI DB7 (16) - SCSI BSY (36)
+SCSI DB6 (14) - SCSI ACK (38)
+SCSI DB5 (12) - SCSI RST (40)
+SCSI DB4 (10) - SCSI MSG (42)
+SCSI DB3 (8)  - SCSI SEL (44)
+SCSI DB2 (6)  - SCSI CD  (46)
+SCSI DB1 (4) -  SCSI IO  (50)
+SCSI DB0 (2) -  SCSI REQ (48)
 
-  modified 8 May 2014
-  by Scott Fitzgerald
-  modified 2 Sep 2016
-  by Arturo Guadalupi
-  modified 8 Sep 2016
-  by Colby Newman
-
-  This example code is in the public domain.
-
-  http://www.arduino.cc/en/Tutorial/Blink
 */
 
 // the setup function runs once when you press reset or power the board
