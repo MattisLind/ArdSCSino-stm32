@@ -42,7 +42,7 @@ SdFatEX  SD(&SPI_1);
 //#define DB5       PB13    // SCSI:DB5
 //#define DB6       PB14    // SCSI:DB6
 //#define DB7       PB15    // SCSI:DB7
-//#define DBP       PA8     // SCSI:DBP
+//#define DBP       PB0     // SCSI:DBP
 
 #define ATN       PA15      // SCSI:ATN
 #define BSY       PB3      // SCSI:BSY
@@ -333,7 +333,7 @@ void writeDataPhase(int len, byte* p)
 #define BITMASK(VPIN) (1<<((VPIN)&15))
 #define PTY(V)   (1^((V)^((V)>>1)^((V)>>2)^((V)>>3)^((V)>>4)^((V)>>5)^((V)>>6)^((V)>>7))&1)
 
-#define DBP(D)    ((((((uint32_t)(D)<<8)|PTY(D))*0x00010001)^0x0000ff01)|BITMASK(vREQ))
+#define DBP(D)    ((((((uint32_t)(D)<<8)|PTY(D))*0x00010001)^0x0000ff01))
 
 #define DBP8(D)   DBP(D),DBP(D+1),DBP(D+2),DBP(D+3),DBP(D+4),DBP(D+5),DBP(D+6),DBP(D+7)
 #define DBP32(D)  DBP8(D),DBP8(D+8),DBP8(D+16),DBP8(D+24)
