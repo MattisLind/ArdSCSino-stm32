@@ -1107,7 +1107,11 @@ void loop()
       if (m_msb[i] == 0x01) {
         // 同期転送が可能な時だけチェック
         if (!syncenable || m_msb[i + 2] != 0x01) {
-          MsgIn2(0x07);
+          //MsgIn2(0x07); -- To handle SUN 3/60. 
+          // It seems that the ident sent gets detected as a 0x01 message instead of 0xc0 which is actually sent.
+          // commenting out this prevents the operation to timeout when the target tries to respond back with a REJECT message
+          // while the host is not anticipating it.
+          // Might not work for other hosts?
           break;
         }
         // Transfer period factor(50 x 4 = 200nsに制限)
@@ -1163,76 +1167,79 @@ void loop()
     LOGHEX(cmd[i]);
   }
   LOGN("");
-
-  switch(cmd[0]) {
-  case 0x00:
-    LOGN("[Test Unit]");
-    break;
-  case 0x01:
-    LOGN("[Rezero Unit]");
-    break;
-  case 0x03:
-    LOGN("[RequestSense]");
-    onRequestSenseCommand(cmd[4]);
-    break;
-  case 0x04:
-    LOGN("[FormatUnit]");
-    break;
-  case 0x06:
-    LOGN("[FormatUnit]");
-    break;
-  case 0x07:
-    LOGN("[ReassignBlocks]");
-    break;
-  case 0x08:
-    LOGN("[Read6]");
-    sts = onReadCommand((((uint32_t)cmd[1] & 0x1F) << 16) | ((uint32_t)cmd[2] << 8) | cmd[3], (cmd[4] == 0) ? 0x100 : cmd[4]);
-    break;
-  case 0x0A:
-    LOGN("[Write6]");
-    sts = onWriteCommand((((uint32_t)cmd[1] & 0x1F) << 16) | ((uint32_t)cmd[2] << 8) | cmd[3], (cmd[4] == 0) ? 0x100 : cmd[4]);
-    break;
-  case 0x0B:
-    LOGN("[Seek6]");
-    break;
-  case 0x12:
-    LOGN("[Inquiry]");
-    onInquiryCommand(cmd[4]);
-    break;
-  case 0x1A:
-    LOGN("[ModeSense6]");
-    onModeSenseCommand(cmd[1]&0x80, cmd[2] & 0x3F, cmd[4]);
-    break;
-  case 0x1B:
-    LOGN("[StartStopUnit]");
-    break;
-  case 0x1E:
-    LOGN("[PreAllowMed.Removal]");
-    break;
-  case 0x25:
-    LOGN("[ReadCapacity]");
-    onReadCapacityCommand(cmd[8]);
-    break;
-  case 0x28:
-    LOGN("[Read10]");
-    sts = onReadCommand(((uint32_t)cmd[2] << 24) | ((uint32_t)cmd[3] << 16) | ((uint32_t)cmd[4] << 8) | cmd[5], ((uint32_t)cmd[7] << 8) | cmd[8]);
-    break;
-  case 0x2A:
-    LOGN("[Write10]");
-    sts = onWriteCommand(((uint32_t)cmd[2] << 24) | ((uint32_t)cmd[3] << 16) | ((uint32_t)cmd[4] << 8) | cmd[5], ((uint32_t)cmd[7] << 8) | cmd[8]);
-    break;
-  case 0x2B:
-    LOGN("[Seek10]");
-    break;
-  case 0x5A:
-    LOGN("[ModeSense10]");
-    onModeSenseCommand(cmd[1] & 0x80, cmd[2] & 0x3F, ((uint32_t)cmd[7] << 8) | cmd[8]);
-    break;
-  default:
-    LOGN("[*Unknown]");
+  if ((cmd[1] & 0xe0) == 0x0) { // This was added so that it wouldn't respon to LUN1. Just LUN0 supported.
+    switch(cmd[0]) {
+    case 0x00:
+      LOGN("[Test Unit]");
+      break;
+    case 0x01:
+      LOGN("[Rezero Unit]");
+      break;
+    case 0x03:
+      LOGN("[RequestSense]");
+      onRequestSenseCommand(cmd[4]);
+      break;
+    case 0x04:
+      LOGN("[FormatUnit]");
+      break;
+    case 0x06:
+      LOGN("[FormatUnit]");
+      break;
+    case 0x07:
+      LOGN("[ReassignBlocks]");
+      break;
+    case 0x08:
+      LOGN("[Read6]");
+      sts = onReadCommand((((uint32_t)cmd[1] & 0x1F) << 16) | ((uint32_t)cmd[2] << 8) | cmd[3], (cmd[4] == 0) ? 0x100 : cmd[4]);
+      break;
+    case 0x0A:
+      LOGN("[Write6]");
+      sts = onWriteCommand((((uint32_t)cmd[1] & 0x1F) << 16) | ((uint32_t)cmd[2] << 8) | cmd[3], (cmd[4] == 0) ? 0x100 : cmd[4]);
+      break;
+    case 0x0B:
+      LOGN("[Seek6]");
+      break;
+    case 0x12:
+      LOGN("[Inquiry]");
+      onInquiryCommand(cmd[4]);
+      break;
+    case 0x1A:
+      LOGN("[ModeSense6]");
+      onModeSenseCommand(cmd[1]&0x80, cmd[2] & 0x3F, cmd[4]);
+      break;
+    case 0x1B:
+      LOGN("[StartStopUnit]");
+      break;
+    case 0x1E:
+      LOGN("[PreAllowMed.Removal]");
+      break;
+    case 0x25:
+      LOGN("[ReadCapacity]");
+      onReadCapacityCommand(cmd[8]);
+      break;
+    case 0x28:
+      LOGN("[Read10]");
+      sts = onReadCommand(((uint32_t)cmd[2] << 24) | ((uint32_t)cmd[3] << 16) | ((uint32_t)cmd[4] << 8) | cmd[5], ((uint32_t)cmd[7] << 8) | cmd[8]);
+      break;
+    case 0x2A:
+      LOGN("[Write10]");
+      sts = onWriteCommand(((uint32_t)cmd[2] << 24) | ((uint32_t)cmd[3] << 16) | ((uint32_t)cmd[4] << 8) | cmd[5], ((uint32_t)cmd[7] << 8) | cmd[8]);
+      break;
+    case 0x2B:
+      LOGN("[Seek10]");
+      break;
+    case 0x5A:
+      LOGN("[ModeSense10]");
+      onModeSenseCommand(cmd[1] & 0x80, cmd[2] & 0x3F, ((uint32_t)cmd[7] << 8) | cmd[8]);
+      break;
+    default:
+      LOGN("[*Unknown]");
+      sts = 2;
+      m_senseKey = 5;
+      break;
+    }
+  } else {
     sts = 2;
-    m_senseKey = 5;
-    break;
   }
   if(m_isBusReset) {
      goto BusFree;
